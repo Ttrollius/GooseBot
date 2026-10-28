@@ -1,7 +1,7 @@
 # GooseBot
 # Municipal Website Chatbot: Tock Option
 
-Oct 28, 2026 · @Adam
+Oct 28, 2026 · Adam & Evan
 
 ## Summary
 
