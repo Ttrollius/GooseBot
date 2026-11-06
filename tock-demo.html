@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Town of Harbour Cove | Tock Chatbot Demo</title>
+
+  <!--
+    ================================================================
+    TOCK INTEGRATION DEMO
+    ================================================================
+    This page has two clearly separated parts:
+
+      1. "EXISTING SITE"  - a stand-in for the town's current website.
+                            Nothing here knows about the chatbot.
+      2. "CHATBOT ADD-ON" - everything the town's site would need to
+                            add. Search this file for "CHATBOT ADD-ON"
+                            to see every integration point (4 total):
+                              A. CSS for the bubble and panel
+                              B. Launcher + panel markup
+                              C. The Tock React Kit script tag
+                              D. The init script
+
+    HOW TO RUN
+      - Download the standalone bundle and save it next to this file:
+          https://unpkg.com/tock-react-kit@latest/build/tock-react-kit-standalone.umd.js
+        (In production, pin a specific version instead of @latest.)
+      - Serve this folder over HTTP rather than opening the file
+        directly, e.g.  python -m http.server 5500
+        then visit      http://localhost:5500/tock-demo.html
+        (file:// pages send a "null" origin, which breaks CORS.)
+      - Set BOT_API_URL below to your Web connector URL from Tock Studio.
+    ================================================================
+  -->
+
+  <!-- ============ EXISTING SITE: base styles ============ -->
+  <style>
+    :root {
+      --site-navy: #12355b;
+      --site-teal: #1f7a8c;
+      --site-sand: #f4efe6;
+      --site-ink: #1e2329;
+      --site-muted: #5b6570;
+      --site-line: #d9dde2;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--site-ink);
+      background: #fff;
+      line-height: 1.6;
+    }
+    a { color: var(--site-teal); }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+
+    .utility { background: var(--site-navy); color: #dfe8f1; font: 13px/1.4 Arial, sans-serif; }
+    .utility .wrap { display: flex; justify-content: space-between; padding-top: 6px; padding-bottom: 6px; }
+    .utility a { color: #fff; }
+
+    header.site { border-bottom: 1px solid var(--site-line); }
+    header.site .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-top: 18px; padding-bottom: 18px; flex-wrap: wrap; }
+    .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--site-navy); }
+    .brand-mark { width: 44px; height: 44px; border-radius: 50%; background: var(--site-navy); display: grid; place-items: center; color: #fff; font-weight: bold; }
+    .brand-name { font-size: 22px; font-weight: bold; }
+    nav.main ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 22px; flex-wrap: wrap; font: 15px Arial, sans-serif; }
+    nav.main a { text-decoration: none; color: var(--site-ink); }
+    nav.main a:hover { color: var(--site-teal); }
+
+    .hero { background: var(--site-sand); padding: 56px 0; }
+    .hero h1 { font-size: 38px; margin: 0 0 10px; color: var(--site-navy); }
+    .hero p { max-width: 640px; color: var(--site-muted); font-size: 18px; margin: 0; }
+
+    section.block { padding: 48px 0; }
+    section.block h2 { color: var(--site-navy); margin-top: 0; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; }
+    .card { border: 1px solid var(--site-line); border-radius: 6px; padding: 20px; }
+    .card h3 { margin: 0 0 6px; font-size: 19px; }
+    .card p { margin: 0; color: var(--site-muted); font-size: 15px; }
+
+    .news-item { border-top: 1px solid var(--site-line); padding: 18px 0; }
+    .news-item time { font: 13px Arial, sans-serif; color: var(--site-muted); }
+    .news-item h3 { margin: 4px 0; }
+
+    footer.site { background: var(--site-navy); color: #dfe8f1; padding: 36px 0; font: 14px Arial, sans-serif; }
+    footer.site a { color: #fff; }
+    .footer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; }
+  </style>
+
+  <!-- ============ CHATBOT ADD-ON (A): bubble + panel styles ============ -->
+  <!--
+    Everything is prefixed with "tc-" so it can't collide with the
+    town's existing CSS, and nothing here styles bare elements.
+  -->
+  <style>
+    .tc-launcher {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 9999;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: none;
+      background: #1f7a8c;
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+      display: grid;
+      place-items: center;
+    }
+    .tc-launcher:hover { background: #18606e; }
+    .tc-launcher:focus-visible { outline: 3px solid #f2b705; outline-offset: 3px; }
+    .tc-launcher svg { width: 28px; height: 28px; }
+    .tc-launcher .tc-icon-close { display: none; }
+    .tc-launcher[aria-expanded="true"] .tc-icon-chat { display: none; }
+    .tc-launcher[aria-expanded="true"] .tc-icon-close { display: block; }
+
+    .tc-panel {
+      position: fixed;
+      right: 20px;
+      bottom: 92px;
+      z-index: 9998;
+      width: 370px;
+      height: min(560px, calc(100vh - 120px));
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .tc-panel[hidden] { display: none; }
+
+    .tc-header {
+      background: #12355b;
+      color: #fff;
+      padding: 12px 14px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .tc-title { margin: 0; font-size: 16px; font-weight: bold; }
+    .tc-notice { margin: 2px 0 0; font-size: 12px; line-height: 1.35; color: #c9d6e3; }
+    .tc-close {
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .tc-close:focus-visible { outline: 2px solid #f2b705; }
+
+    /* Tock React Kit renders into this element and fills it. */
+    .tc-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .tc-chat > * { flex: 1; min-height: 0; }
+
+    .tc-status {
+      margin: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #fff4e5;
+      color: #6b4300;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .tc-status code { font-size: 12px; word-break: break-all; }
+
+    /* Phones: open full screen instead of a floating box. */
+    @media (max-width: 480px) {
+      .tc-panel {
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+      }
+      .tc-launcher[aria-expanded="true"] { display: none; }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .tc-panel { animation: tc-rise 160ms ease-out; }
+      @keyframes tc-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ================= EXISTING SITE ================= -->
+  <div class="utility">
+    <div class="wrap">
+      <span>Town Hall: 709-555-0100 · Mon–Fri, 8:30–4:30</span>
+      <a href="#">Pay a bill</a>
+    </div>
+  </div>
+
+  <header class="site">
+    <div class="wrap">
+      <a class="brand" href="#">
+        <span class="brand-mark">HC</span>
+        <span class="brand-name">Town of Harbour Cove</span>
+      </a>
+      <nav class="main" aria-label="Main">
+        <ul>
+          <li><a href="#">Residents</a></li>
+          <li><a href="#">Business</a></li>
+          <li><a href="#">Council</a></li>
+          <li><a href="#">Recreation</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div class="wrap">
+        <h1>Welcome to Harbour Cove</h1>
+        <p>Find town services, schedules and news. Questions? Try the chat assistant in the corner of any page.</p>
+      </div>
+    </div>
+
+    <section class="block">
+      <div class="wrap">
+        <h2>Popular services</h2>
+        <div class="cards">
+          <div class="card"><h3>Garbage &amp; recycling</h3><p>Collection schedules, sorting guide and large item pickup.</p></div>
+          <div class="card"><h3>Permits</h3><p>Building, renovation, fence and accessory building permits.</p></div>
+          <div class="card"><h3>Report a problem</h3><p>Potholes, streetlights, water and sewer issues.</p></div>
+          <div class="card"><h3>Property tax</h3><p>Due dates, payment options and assessment information.</p></div>
+          <div class="card"><h3>Recreation</h3><p>Programs, facility bookings and the community centre.</p></div>
+          <div class="card"><h3>Council meetings</h3><p>Agendas, minutes and how to attend.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" style="background: var(--site-sand);">
+      <div class="wrap">
+        <h2>News &amp; notices</h2>
+        <article class="news-item">
+          <time datetime="2026-11-02">November 2, 2026</time>
+          <h3>Winter parking ban begins December 1</h3>
+          <p>Overnight street parking is not permitted from midnight to 7 a.m. to allow for snow clearing.</p>
+        </article>
+        <article class="news-item">
+          <time datetime="2026-10-28">October 28, 2026</time>
+          <h3>Fall leaf and yard waste collection</h3>
+          <p>Bagged leaves will be collected on regular garbage days through November 20.</p>
+        </article>
+        <article class="news-item">
+          <time datetime="2026-10-21">October 21, 2026</time>
+          <h3>Community centre gym floor upgrades</h3>
+          <p>The gym will be closed for refinishing. Other rooms remain open as usual.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="wrap">
+        <h2>About this demo</h2>
+        <p>This is a fictional town website used to test how a Tock chatbot fits into an existing site. Scroll down: the chat bubble stays fixed in the bottom-right corner.</p>
+        <p style="height: 600px;">Extra space so the page scrolls.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site">
+    <div class="wrap footer-grid">
+      <div><strong>Town of Harbour Cove</strong><br>1 Water Street<br>Harbour Cove, NL</div>
+      <div>Phone: 709-555-0100<br><a href="#">Contact form</a></div>
+      <div><a href="#">Privacy</a> · <a href="#">Accessibility</a></div>
+    </div>
+  </footer>
+  <!-- ================= END EXISTING SITE ================= -->
+
+
+  <!-- ============ CHATBOT ADD-ON (B): launcher + panel markup ============ -->
+  <button class="tc-launcher" type="button" aria-expanded="false" aria-controls="tc-panel" aria-label="Open chat assistant">
+    <svg class="tc-icon-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>
+    </svg>
+    <svg class="tc-icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <path d="M6 6l12 12M18 6L6 18"/>
+    </svg>
+  </button>
+
+  <section class="tc-panel" id="tc-panel" role="dialog" aria-modal="false" aria-labelledby="tc-title" hidden>
+    <div class="tc-header">
+      <div>
+        <p class="tc-title" id="tc-title">Harbour Cove Assistant</p>
+        <p class="tc-notice">General information only. Please don't share personal details here.</p>
+      </div>
+      <button class="tc-close" type="button" aria-label="Close chat">&times;</button>
+    </div>
+    <div class="tc-chat" id="tc-chat"></div>
+  </section>
+
+
+  <!-- ============ CHATBOT ADD-ON (C): Tock React Kit (self-hosted copy) ============ -->
+  <script src="./tock-react-kit-standalone.umd.js"></script>
+
+
+  <!-- ============ CHATBOT ADD-ON (D): init script ============ -->
+  <script>
+    (function () {
+      // ---- Configuration ------------------------------------------
+      // Copy this from your Web connector in Tock Studio.
+      // The value below is only an example; your path will differ.
+      var BOT_API_URL = 'http://localhost:8080/io/app/new_assistant/web';
+
+      // Optional: a sentence sent silently when the chat first opens,
+      // to trigger a welcome story you've set up in Tock Studio.
+      // Set to null to start with an empty chat.
+      var OPENING_MESSAGE = null;
+
+      // ---- Elements -----------------------------------------------
+      var launcher = document.querySelector('.tc-launcher');
+      var panel = document.getElementById('tc-panel');
+      var closeBtn = panel.querySelector('.tc-close');
+      var chatEl = document.getElementById('tc-chat');
+      var started = false;
+
+      // ---- Start Tock only when the resident first opens the chat --
+      // Nothing connects to the bot server until then.
+      function startChat() {
+        if (started) return;
+        started = true;
+
+        if (typeof window.TockReact === 'undefined') {
+          chatEl.innerHTML =
+            '<div class="tc-status"><strong>Chat script not loaded.</strong><br>' +
+            'Save <code>tock-react-kit-standalone.umd.js</code> next to this page, ' +
+            'then reload. See the comment at the top of this file.</div>';
+          return;
+        }
+
+        var theme = {
+          palette: {
+            background: { user: '#1f7a8c', bot: '#eef2f5', input: '#ffffff', inputDisabled: '#e3e6ea' },
+            text: { user: '#ffffff', bot: '#1e2329', input: '#1e2329' }
+          },
+          sizing: { borderRadius: '10px', conversation: { width: '100%' } },
+          typography: { fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '15px' },
+          overrides: { chat: 'height: 100%; background: #ffffff;' }
+        };
+
+        var options = {
+          locale: 'en-CA',
+          // Message history stays OFF: residents may type personal details.
+          localStorage: { enableMessageHistory: false },
+          accessibility: {
+            input: { sendButtonLabel: 'Send message', clearButtonLabel: 'Clear conversation' }
+          }
+        };
+        if (OPENING_MESSAGE) options.openingMessage = OPENING_MESSAGE;
+
+        try {
+          window.TockReact.renderChat(chatEl, BOT_API_URL, undefined, theme, options);
+        } catch (err) {
+          console.error('Tock renderChat failed:', err);
+          chatEl.innerHTML =
+            '<div class="tc-status"><strong>Couldn\'t start the chat.</strong><br>' +
+            'Check the browser console, and that <code>' + BOT_API_URL + '</code> is reachable.</div>';
+        }
+      }
+
+      // ---- Open / close -------------------------------------------
+      function openPanel() {
+        panel.hidden = false;
+        launcher.setAttribute('aria-expanded', 'true');
+        launcher.setAttribute('aria-label', 'Close chat assistant');
+        startChat();
+        // Move focus into the chat (the text input if Tock has rendered it).
+        setTimeout(function () {
+          var input = panel.querySelector('input, textarea');
+          (input || closeBtn).focus();
+        }, 50);
+      }
+
+      function closePanel() {
+        panel.hidden = true;
+        launcher.setAttribute('aria-expanded', 'false');
+        launcher.setAttribute('aria-label', 'Open chat assistant');
+        launcher.focus();
+      }
+
+      launcher.addEventListener('click', function () {
+        panel.hidden ? openPanel() : closePanel();
+      });
+      closeBtn.addEventListener('click', closePanel);
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !panel.hidden) closePanel();
+      });
+    })();
+  </script>
+</body>
+</html>
